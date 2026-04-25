@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.env
+
+# DVC managed data
+data/raw/
+data/golden/
+data/processed/
+data/splits/
+data/reference/
+data/pipeline_run_id.txt
+
+# Mlflow
+mlruns/
+artifacts_tmp/
+
+# Reports
+reports/
+
+# Runtime
+*.db
+*.log
+airflow/logs/
+
+.dvc/tmp/
+
+# IDE
+.vscode/
+.idea/
