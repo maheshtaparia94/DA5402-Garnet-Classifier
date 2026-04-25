@@ -32,7 +32,7 @@ stages:
           separator: "\t"
           has_header: false
         preprocessing:
-          apply_advanced: false
+          apply_advanced: true
           baseline:
             lam: 100000.0
             max_iter: 50
@@ -46,8 +46,8 @@ stages:
     outs:
     - path: data/processed/spectra_preprocessed.csv
       hash: md5
-      md5: 2b693a8a40f17cc3b2814249a18cb70d
-      size: 2981837
+      md5: 5d4b1c8f5cf296889e030ee41a9c2394
+      size: 3407405
   split_data:
     cmd: python -m src.data.splitter
     deps:

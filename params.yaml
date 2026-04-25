@@ -18,7 +18,7 @@ wavenumber:
   n_points: 1101
 
 preprocessing:
-  apply_advanced: false
+  apply_advanced: true
   baseline:
     lam: 1.0e+5
     max_iter: 50
