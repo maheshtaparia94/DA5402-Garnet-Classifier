@@ -1,0 +1,8 @@
+mlflow==3.11.1
+numpy==2.4.4
+scikit-learn==1.8.0
+torch==2.11.0
+scipy==1.17.1
+pybaselines==1.2.1
+pandas==2.2.3
+psutil==6.0.0

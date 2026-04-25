@@ -1,0 +1,85 @@
+groups:
+- name: cpu_node
+  rules:
+  - record: cpu_util
+    expr: '1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m]))
+
+      '
+- name: app_health
+  rules:
+  - alert: AppDown
+    expr: up{job="fastapi"} == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: FastAPI is DOWN
+      description: FastAPI unreachable for 30s.
+  - alert: PredictionErrorRate
+    expr: actual_error_rate > 0.05
+    for: 15m
+    labels:
+      severity: critical
+    annotations:
+      summary: Actual error rate exceeds 5%
+      description: Error rate {{ $value | humanizePercentage }} from feedback.
+  - alert: HighLowConfidenceRate
+    expr: low_confidence_rate > 0.70
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: Low confidence rate exceeds 70%
+      description: Low confidence rate {{ $value | humanizePercentage }}.
+  - alert: DataDriftDetected
+    expr: avg_over_time(drift_score[1h]) > 0.3
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: Data drift detected
+      description: Drift score is {{ $value }}.
+  - alert: ModelServerDown
+    expr: up{job="model-server"} == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: Model server is DOWN
+      description: "Model server unreachable for 30s \u2014 predictions will fail."
+  - alert: HighInferenceLatency
+    expr: histogram_quantile(0.99, rate(inference_latency_ms_bucket[5m])) > 200
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: Inference p99 latency exceeds 200ms
+      description: "p99 latency is {{ $value }}ms \u2014 business SLA breached."
+      
+- name: resource_overuse
+  rules:
+  - alert: HighCPUUsage
+    expr: cpu_util > 0.80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: CPU above 80% for 2+ minutes
+      description: CPU at {{ $value | humanizePercentage }}.
+  - alert: LowMemoryAvailable
+    expr: "(node_memory_MemAvailable_bytes /\n node_memory_MemTotal_bytes) < 0.10\n"
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: Available RAM below 20%
+      description: Only {{ $value | humanizePercentage }} RAM free.
+  - alert: DiskSpaceLow
+    expr: "(node_filesystem_avail_bytes{mountpoint=\"/\"}\n / node_filesystem_size_bytes{mountpoint=\"\
+      /\"}) < 0.10\n"
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: Disk below 10%
+      description: Root filesystem nearly full.s
