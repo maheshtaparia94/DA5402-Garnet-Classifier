@@ -9,3 +9,6 @@ version = "0.1"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[tool.pytest.ini_options]
+markers = ["needs_model: tests requiring model-server and DB running"]
