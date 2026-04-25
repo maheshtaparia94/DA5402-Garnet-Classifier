@@ -1,0 +1,226 @@
+schema: '2.0'
+stages:
+  preprocess:
+    cmd: python -m src.data.preprocessor
+    deps:
+    - path: data/raw/
+      hash: md5
+      md5: 314765b4c2c064255f7960ae53c99e72.dir
+      size: 3879310
+      nfiles: 148
+    - path: src/data/preprocessor.py
+      hash: md5
+      md5: a592cc2e08396a5a1aa01c74ade4834d
+      size: 4266
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    params:
+      params.yaml:
+        data:
+          raw_dir: data/raw
+          processed_dir: data/processed
+          splits_dir: data/splits
+          reference_dir: data/reference
+          classes:
+          - Almandine
+          - Andradite
+          - Grossular
+          - Pyrope
+          - Spessartite
+          separator: "\t"
+          has_header: false
+        preprocessing:
+          apply_advanced: false
+          baseline:
+            lam: 100000.0
+            max_iter: 50
+          smoothing:
+            window_length: 11
+            polyorder: 3
+        wavenumber:
+          start: 200
+          end: 1300
+          n_points: 1101
+    outs:
+    - path: data/processed/spectra_preprocessed.csv
+      hash: md5
+      md5: 2b693a8a40f17cc3b2814249a18cb70d
+      size: 2981837
+  split_data:
+    cmd: python -m src.data.splitter
+    deps:
+    - path: data/processed/spectra_preprocessed.csv
+      hash: md5
+      md5: 2b693a8a40f17cc3b2814249a18cb70d
+      size: 2981837
+    - path: src/data/splitter.py
+      hash: md5
+      md5: e146da32b7b17f1fe8f2e66ee0accbb5
+      size: 2051
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    params:
+      params.yaml:
+        split:
+          test_size: 0.15
+          val_size: 0.15
+          random_state: 42
+    outs:
+    - path: data/splits/
+      hash: md5
+      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      size: 1305838
+      nfiles: 7
+  baseline_stats:
+    cmd: python -m src.data.baseline_stats
+    deps:
+    - path: data/splits/
+      hash: md5
+      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      size: 1305838
+      nfiles: 7
+    - path: src/data/baseline_stats.py
+      hash: md5
+      md5: 83ffdc79507f2dfa531c304dc0948276
+      size: 1144
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    params:
+      params.yaml:
+        baseline_stats:
+          std_threshold: 3.0
+    outs:
+    - path: data/reference/
+      hash: md5
+      md5: ef5928554214d0615702e3ae8da5e9dd.dir
+      size: 62484
+      nfiles: 2
+  eda:
+    cmd: python -m src.data.eda
+    deps:
+    - path: data/processed/spectra_preprocessed.csv
+      hash: md5
+      md5: 2b693a8a40f17cc3b2814249a18cb70d
+      size: 2981837
+    - path: data/splits/
+      hash: md5
+      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      size: 1305838
+      nfiles: 7
+    - path: src/data/eda.py
+      hash: md5
+      md5: bab437740762f4357e19671f7d327248
+      size: 3812
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    outs:
+    - path: reports/
+      hash: md5
+      md5: 40ee39c795841a829bd63e999d426241.dir
+      size: 811126
+      nfiles: 5
+  train:
+    cmd: python -m src.models.train_model
+    deps:
+    - path: data/splits/
+      hash: md5
+      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      size: 1305838
+      nfiles: 7
+    - path: src/models/train_cnn.py
+      hash: md5
+      md5: 937a2bfc1c8c0c5c869f1d8dc9171b08
+      size: 5101
+    - path: src/models/train_mlp.py
+      hash: md5
+      md5: 4336657b74c8d0812213cc3d362b5226
+      size: 4619
+    - path: src/models/train_model.py
+      hash: md5
+      md5: 64fd476f082fd902d9d7cb4191e7696d
+      size: 12774
+    - path: src/models/train_plsda.py
+      hash: md5
+      md5: 0be696f38253d554ddda8f9f4a07c66e
+      size: 2424
+    - path: src/models/train_rf.py
+      hash: md5
+      md5: d63e245bc340d1b09d5a8bbc1b61ff98
+      size: 2151
+    - path: src/models/train_svm.py
+      hash: md5
+      md5: 170c7a4311eef372415f2a5bc5d1508f
+      size: 2065
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    params:
+      params.yaml:
+        mlflow:
+          tracking_uri: mlruns
+          registry_name: garnet-classifier
+          experiment_name: garnet-classifier
+    outs:
+    - path: data/pipeline_run_id.txt
+      hash: md5
+      md5: 0cda8c83c209d6d18149cdfddb74105c
+      size: 36
+  evaluate:
+    cmd: python -m src.models.evaluate
+    deps:
+    - path: data/splits/
+      hash: md5
+      md5: ce9f387ae7e21461f660cee4809226fe.dir
+      size: 1446894
+      nfiles: 7
+    - path: src/models/evaluate.py
+      hash: md5
+      md5: f1f0871ba2f9eff0262fb77a1fc39f56
+      size: 5067
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    params:
+      params.yaml:
+        mlflow:
+          tracking_uri: mlruns
+          registry_name: garnet-classifier
+          experiment: garnet-classifier
+  evaluate_register:
+    cmd: python -m src.models.evaluate_register
+    deps:
+    - path: data/golden/
+      hash: md5
+      md5: 6a73def275c618cff31107d52ee4b4b1.dir
+      size: 767188
+      nfiles: 29
+    - path: data/pipeline_run_id.txt
+      hash: md5
+      md5: 0cda8c83c209d6d18149cdfddb74105c
+      size: 36
+    - path: src/models/evaluate_register.py
+      hash: md5
+      md5: 04904bd6ffa745c7e02e7cae4b3a4a70
+      size: 7266
+    - path: src/utils.py
+      hash: md5
+      md5: 0eafb4e0ee034311499e023467588aff
+      size: 1630
+    params:
+      params.yaml:
+        evaluation:
+          min_f1_threshold: 0.7
+        mlflow:
+          tracking_uri: mlruns
+          registry_name: garnet-classifier
+          experiment_name: garnet-classifier
