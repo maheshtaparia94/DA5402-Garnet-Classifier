@@ -1,0 +1,78 @@
+stages:
+
+  preprocess:
+    cmd: python -m src.data.preprocessor
+    deps:
+      - src/data/preprocessor.py
+      - src/utils.py
+      - data/raw/
+    params:
+      - data
+      - wavenumber
+      - preprocessing
+    outs:
+      - data/processed/spectra_preprocessed.csv
+
+  split_data:
+    cmd: python -m src.data.splitter
+    deps:
+      - src/data/splitter.py
+      - src/utils.py
+      - data/processed/spectra_preprocessed.csv
+    params:
+      - split
+    outs:
+      - data/splits/
+
+  baseline_stats:
+    cmd: python -m src.data.baseline_stats
+    deps:
+      - src/data/baseline_stats.py
+      - src/utils.py
+      - data/splits/
+    params:
+      - baseline_stats
+    outs:
+      - data/reference/
+
+  eda:
+    cmd: python -m src.data.eda
+    deps:
+      - src/data/eda.py
+      - src/utils.py
+      - data/processed/spectra_preprocessed.csv
+      - data/splits/
+    outs:
+      - reports/:
+          cache: true
+
+  train:
+    cmd: python -m src.models.train_model
+    deps:
+      - src/models/train_model.py
+      - src/models/train_plsda.py
+      - src/models/train_svm.py
+      - src/models/train_rf.py
+      - src/models/train_mlp.py
+      - src/models/train_cnn.py
+      - src/utils.py
+      - data/splits/
+    params:
+      - mlflow
+    outs:
+      - data/pipeline_run_id.txt:
+          cache: false
+  
+  evaluate_register:
+    cmd: python -m src.models.evaluate_register
+    deps:
+      - src/models/evaluate_register.py
+      - src/utils.py
+      - data/pipeline_run_id.txt
+      - data/golden/
+    params:
+      - mlflow
+      - evaluation
+    outs: []
+
+

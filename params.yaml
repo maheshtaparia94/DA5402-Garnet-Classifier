@@ -1,0 +1,46 @@
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  splits_dir: data/splits
+  reference_dir: data/reference
+  classes:
+    - Almandine
+    - Andradite
+    - Grossular
+    - Pyrope
+    - Spessartite
+  separator:  "\t"
+  has_header: false
+
+wavenumber:
+  start:    200
+  end:      1300
+  n_points: 1101
+
+preprocessing:
+  apply_advanced: false
+  baseline:
+    lam: 1.0e+5
+    max_iter: 50
+  smoothing:
+    window_length: 11
+    polyorder:     3
+
+split:
+  test_size: 0.15
+  val_size: 0.15
+  random_state: 42
+
+baseline_stats:
+  std_threshold: 3.0
+
+mlflow:
+  tracking_uri: mlruns
+  registry_name: garnet-classifier
+  experiment_name: garnet-classifier
+
+monitoring:
+  error_rate_threshold: 0.05
+
+evaluation:
+  min_f1_threshold: 0.7
