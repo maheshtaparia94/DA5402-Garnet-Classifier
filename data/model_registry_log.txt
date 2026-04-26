@@ -1,5 +1,5 @@
-version=2
-run_id=97e0f4e589024c79a89291beb86a7813
-golden_f1=0.7967
-timestamp=2026-04-25T15:38:12.857375
-pipeline_run_id=367ac4f5-6c6b-4a07-b4d5-a0ae7a497625
+version=3
+run_id=0eda90280eeb4ce090e4cd57fc23b78d
+golden_f1=0.8937
+timestamp=2026-04-26T00:13:15.886186
+pipeline_run_id=efa66b9c-0a4f-4a87-a132-fa2cbdbacf53
