@@ -2,6 +2,7 @@ import mlflow
 import numpy as np
 import torch
 import torch.nn as nn
+import random
 
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import StratifiedKFold
@@ -59,19 +60,34 @@ def _train_one(X_tr, y_tr, X_val, y_val, params, n_classes):
     return f1_score(y_val, preds, average="weighted", zero_division=0), model
 
 
-def train(X_train, y_train, n_classes):
+def train(X_train, y_train, n_classes, cv_folds=5):
     """
     Train 1D-CNN with manual grid + 5-fold CV.
     Returns best model, best params, cv_score.
     """
-    n_splits = max(2, min(5, int(np.bincount(y_train).min())))
-    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    param_grid = [{"n_filters": 32, "kernel_size": 7, "lr": 1e-3, "epochs": 50, "dropout": 0.3},
-        {"n_filters": 64, "kernel_size": 7, "lr": 1e-4, "epochs": 50, "dropout": 0.3},
-        {"n_filters": 64, "kernel_size": 5, "lr": 1e-3, "epochs": 50, "dropout": 0.3},
-        {"n_filters": 32, "kernel_size": 5, "lr": 1e-3, "epochs": 50, "dropout": 0.3}]
-    best_score, best_params = -1, None
+    random.seed(42)
+    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
 
+    search_space = {
+        "n_filters": [32, 64, 128],
+        "kernel_size": [3, 5, 7],
+        "lr": [1e-3, 5e-4, 1e-4],
+        "epochs": [50, 80, 100],
+        "dropout": [0.2, 0.3, 0.4],
+    }
+
+    param_grid = [
+        {
+            "n_filters": random.choice(search_space["n_filters"]),
+            "kernel_size": random.choice(search_space["kernel_size"]),
+            "lr": random.choice(search_space["lr"]),
+            "epochs": random.choice(search_space["epochs"]),
+            "dropout": random.choice(search_space["dropout"]),
+        }
+        for _ in range(15)]
+    
+    best_score, best_params = -1, None
+    print("LENGTH", len(param_grid))
     for trial, params in enumerate(param_grid):
         scores = []
         for tr, val in cv.split(X_train, y_train):

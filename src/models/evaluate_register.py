@@ -21,7 +21,10 @@ def score_on_golden(run_id, config):
     model = mlflow.pyfunc.load_model(f"runs:/{run_id}/model")
     with open("data/splits/label_encoder.pkl", "rb") as f:
         le = pickle.load(f)
-    apply_advanced = config["preprocessing"]["apply_advanced"]
+    
+    run = mlflow.tracking.MlflowClient().get_run(run_id)
+    adv = run.data.tags.get("apply_advanced", "false")
+    apply_advanced = adv.lower() == "true"
     y_true, y_pred = [], []
     for class_dir in sorted(GOLDEN_DIR.iterdir()):
         if not class_dir.is_dir():
@@ -53,55 +56,36 @@ def score_on_golden(run_id, config):
     return round(f1_score(y_true, y_pred, average="weighted", zero_division=0), 4)
 
 
-def get_best_run(client, experiment_name):
-    """
-    Query all parent runs from experiment.
-    Return best run by test_f1_weighted.
-    """
+def get_run(client, experiment_name):
+    """Get the training run for this pipeline. Falls back to most recent."""
     exp = client.get_experiment_by_name(experiment_name)
     if exp is None:
         raise ValueError(f"Experiment '{experiment_name}' not found.")
 
-    pipeline_run_id = ""
-    run_id_file = Path("data/pipeline_run_id.txt")
-    if run_id_file.exists():
-        pipeline_run_id = run_id_file.read_text().strip()
-    # Fallback 1: env var (set by Airflow DAG)
-    if not pipeline_run_id:
-        pipeline_run_id = os.environ.get("PIPELINE_RUN_ID", "")
-    # Fallback 2: most recent MLflow run (manual runs without file)
-    if not pipeline_run_id:
-        recent = client.search_runs(
-            experiment_ids=[exp.experiment_id],
-            filter_string="tags.pipeline_run_id != ''",
-            max_results=1,
-            order_by=["attributes.start_time DESC"])
-        if recent:
-            pipeline_run_id = recent[0].data.tags.get("pipeline_run_id", "")
-    filter_str = (f"tags.pipeline_run_id = '{pipeline_run_id}'"
-                  if pipeline_run_id else "")
-    all_runs = client.search_runs(
+    # Get pipeline_run_id
+    pipeline_run_id = Path("data/pipeline_run_id.txt").read_text().strip() \
+        if Path("data/pipeline_run_id.txt").exists() else \
+        os.environ.get("PIPELINE_RUN_ID", "")
+
+    filter_str = f"tags.pipeline_run_id = '{pipeline_run_id}'" \
+        if pipeline_run_id else ""
+
+    runs = client.search_runs(
         experiment_ids=[exp.experiment_id],
         filter_string=filter_str,
-        order_by=["metrics.test_f1_weighted DESC"])
+        order_by=["attributes.start_time DESC"])
 
     # Parent runs only
-    parent_runs = [ r for r in all_runs
-        if "mlflow.parentRunId" not in r.data.tags]
+    parent_runs = [r for r in runs
+                   if "mlflow.parentRunId" not in r.data.tags]
 
     if not parent_runs:
-        raise ValueError("No parent runs found. Run train_model.py first.")
+        raise ValueError("No runs found. Run train_model.py first.")
 
-    logger.info("All model results:")
-    for r in parent_runs:
-        f1 = r.data.metrics.get("test_f1_weighted", 0)
-        logger.info(f"  {r.info.run_name:25s}  f1_weighted={f1:.4f}")
-
-    best = parent_runs[0]
-    logger.info(f"Best: {best.info.run_name} "
-                f"f1={best.data.metrics.get('test_f1_weighted', 0):.4f}")
-    return best
-
+    run = parent_runs[0]
+    logger.info(f"Run: {run.info.run_name} "
+                f"f1={run.data.metrics.get('test_f1_weighted', 0):.4f}")
+    return run
 
 def register_and_deploy(client, best_run, registry_name, threshold, config):
     # Skip if same run already deployed
@@ -177,7 +161,7 @@ def main():
     client = MlflowClient()
 
     #Get best run
-    best_run = get_best_run(client, exp_name)
+    best_run = get_run(client, exp_name)
 
     #Register, validate, deploy
     passed, f1 = register_and_deploy(client, best_run, reg_name, threshold, config)

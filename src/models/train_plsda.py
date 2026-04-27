@@ -8,15 +8,14 @@ from sklearn.preprocessing import label_binarize
 from sklearn.metrics import f1_score
 
 
-def train(X_train, y_train, n_classes):
+def train(X_train, y_train, n_classes, cv_folds):
     """
     Train PLS-DA with GridSearch over n_components.
     Uses 5-fold stratified CV on X_train.
     Returns best model, best params, cv_scores.
     """
-    n_splits = max(2, min(5, int(np.bincount(y_train).min())))
-    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-    param_grid = {"n_components": [2, 3, 5, 8, 10]}
+    cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
+    param_grid = {"n_components": [2, 3, 5, 8, 10, 15]}
 
     best_score, best_n, best_model = -1, None, None
 

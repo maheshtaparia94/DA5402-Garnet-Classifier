@@ -59,6 +59,7 @@ stages:
       - data/splits/
     params:
       - mlflow
+      - training
     outs:
       - data/pipeline_run_id.txt:
           cache: false
@@ -70,9 +71,6 @@ stages:
       - src/utils.py
       - data/pipeline_run_id.txt
       - data/golden/
-    params:
-      - mlflow
-      - evaluation
     outs: []
 
 

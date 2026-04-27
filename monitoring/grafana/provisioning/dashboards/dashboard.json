@@ -877,14 +877,16 @@
           "refId": "A"
         }
       ],
-      "options": {
+       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": ["lastNotNull"],
+          "values": false,
+          "limit": 1
         },
         "colorMode": "background",
-        "textMode": "auto"
+        "textMode": "value",
+        "graphMode": "none",
+        "orientation": "auto"
       },
       "fieldConfig": {
         "defaults": {
@@ -909,7 +911,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "transparent",
                 "value": null
               },
               {

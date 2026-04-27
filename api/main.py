@@ -4,7 +4,6 @@ import mlflow
 import pickle
 import shutil
 import time
-import threading
 import zipfile
 import numpy as np
 import requests
@@ -40,23 +39,26 @@ LABELED_DIR = Path("data/labeled")
 create_tables()
 PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
 LABELED_DIR.mkdir(parents=True, exist_ok=True)
-
 CURRENT_VERSION = "production"
+DATA_VERSION = "v1"
 
-def _fetch_version():
-    global CURRENT_VERSION
-    import time
-    time.sleep(10)  # wait for model-server to be ready
-    try:
-        client = mlflow.tracking.MlflowClient()
-        mv = client.get_model_version_by_alias(REGISTRY_NAME, "production")
-        CURRENT_VERSION = f"v{mv.version}"
-    except Exception:
-        pass  # keep "production" as default
+try:
+    client = mlflow.tracking.MlflowClient()
+    mv = client.get_model_version_by_alias(REGISTRY_NAME, "production")
+    CURRENT_VERSION = f"v{mv.version}"
+    
+    # Tags are on the run, not the model version
+    run = client.get_run(mv.run_id)
+    adv = run.data.tags.get("apply_advanced", "false")
+    dv  = run.data.tags.get("data_version", "v1")
+    APPLY_ADVANCED = adv.lower() == "true"
+    DATA_VERSION = dv
+except Exception:
+    pass  # keep "production" as default
 
-threading.Thread(target=_fetch_version, daemon=True).start()
+# threading.Thread(target=_fetch_version, daemon=True).start()
 
-#  Load classes + drift detector at startup ───────────────────────────────────
+#  Load classes + drift detector at startup
 try:
     with open("data/splits/label_encoder.pkl", "rb") as f:
         CLASSES = list(pickle.load(f).classes_)
@@ -141,17 +143,16 @@ def get_pending(db: Session = Depends(get_db)):
     ).order_by(Prediction.timestamp.desc()).all()
     return {"predictions": [
         {
-            "id":              r.id,
-            "filename":        r.filename,
+            "id": r.id,
+            "filename": r.filename,
             "predicted_class": r.predicted_class,
-            "confidence":      round(r.confidence, 4),
-            "drift_score":     round(r.drift_score or 0.0, 4),
-            "is_drifted":      r.is_drifted,
+            "confidence": round(r.confidence, 4),
+            "drift_score": round(r.drift_score or 0.0, 4),
+            "is_drifted": r.is_drifted,
             "is_low_confidence": r.is_low_confidence,
-            "timestamp":       r.timestamp.isoformat(),
+            "timestamp": r.timestamp.isoformat(),
         }
-        for r in rows
-    ]}
+        for r in rows ]}
 
 
 @app.get("/predictions/{prediction_id}/spectrum")
@@ -257,7 +258,7 @@ def predict(file: UploadFile = File(...), dry_run: bool = False, db: Session = D
             confidence = float(np.max(probs))
             is_low = confidence < CONF_THRESHOLD
 
-            # ── Drift detection ─────────────────────────────────
+            # ── Drift detection
             if DETECTOR:
                 det_result = DETECTOR.detect(X.flatten())
             else:
@@ -273,32 +274,32 @@ def predict(file: UploadFile = File(...), dry_run: bool = False, db: Session = D
                 for w, iv in zip(wn, intensity):
                     fout.write(f"{w}\t{iv}\n")
 
-            # ── Prometheus counters ─────────────────────────────
+            # Prometheus counters
             predictions_total.inc()
             if is_low:
                 low_confidence_total.inc()
 
             if not dry_run:
-                # ── Store to DB ─────────────────────────────────────
+                # ── Store to DB 
                 db.add(Prediction(
-                    filename          = fname,
-                    file_path         = str(file_path),
-                    predicted_class   = predicted_class,
-                    confidence        = confidence,
+                    filename = fname,
+                    file_path = str(file_path),
+                    predicted_class = predicted_class,
+                    confidence = confidence,
                     is_low_confidence = is_low,
-                    drift_score       = d_score,
-                    is_drifted        = d_flagged,
-                    model_version     = CURRENT_VERSION,
-                    data_version      = "v1",
-                ))
+                    drift_score = d_score,
+                    is_drifted  = d_flagged,
+                    model_version = CURRENT_VERSION,
+                    data_version = DATA_VERSION))
+                
             results.append(PredictionResult(
-                filename        = fname,
+                filename = fname,
                 predicted_class = predicted_class,
-                confidence      = confidence,
-                probabilities   = {c: float(p) for c, p in zip(CLASSES, probs)},
-                model_version   = CURRENT_VERSION,
-                data_version    = "v1",
-            ))
+                confidence = confidence,
+                probabilities = {c: float(p) for c, p in zip(CLASSES, probs)},
+                model_version = CURRENT_VERSION,
+                drift_score = d_score))
+            
         if not dry_run:
             db.commit()
             _update_rates(db)
@@ -311,12 +312,9 @@ def predict(file: UploadFile = File(...), dry_run: bool = False, db: Session = D
     ms = (time.time() - start) * 1000
     inference_latency.observe(ms)
 
-    
-
     return PredictResponse(
         predictions = results,
         total = len(results),
-        model_version = CURRENT_VERSION,
         processing_time_ms = ms)
 
 
@@ -343,7 +341,7 @@ def feedback(req: FeedbackRequest, db: Session = Depends(get_db)):
     # Move to labeled folder if flagged for retraining
     if (record.is_wrong or record.is_low_confidence or record.is_drifted) \
             and record.file_path and Path(record.file_path).exists():
-        ts   = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         dest = LABELED_DIR / f"{ts}_{req.ground_truth}_{record.filename}"
         shutil.move(record.file_path, dest)
         record.file_path = str(dest)
@@ -351,10 +349,10 @@ def feedback(req: FeedbackRequest, db: Session = Depends(get_db)):
 
     _update_rates(db)
     return {
-        "filename":        req.filename,
+        "filename": req.filename,
         "predicted_class": record.predicted_class,
-        "ground_truth":    req.ground_truth,
-        "is_wrong":        record.is_wrong,
+        "ground_truth": req.ground_truth,
+        "is_wrong": record.is_wrong,
     }
 
 

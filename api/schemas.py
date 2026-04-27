@@ -9,16 +9,14 @@ class PredictionResult(BaseModel):
     predicted_class: str
     confidence: float
     probabilities: Dict[str, float]
+    drift_score: float
     model_version: str
-    data_version: str
-
 
 class PredictResponse(BaseModel):
     """Response for both single and bulk predictions."""
     model_config = ConfigDict(protected_namespaces=())
     predictions: List[PredictionResult]
     total: int
-    model_version: str
     processing_time_ms: float
 
 

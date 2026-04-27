@@ -15,6 +15,7 @@ import uuid
 
 from dotenv import load_dotenv
 from pathlib import Path
+from sklearn.base import clone
 from sklearn.metrics import (
     f1_score, accuracy_score, classification_report,
     confusion_matrix, ConfusionMatrixDisplay,
@@ -26,8 +27,8 @@ from src.utils import load_config, get_logger
 from src.models.train_plsda import train as train_plsda, predict as pred_plsda
 from src.models.train_svm import train as train_svm, predict as pred_svm
 from src.models.train_rf import train as train_rf, predict as pred_rf
-from src.models.train_mlp import train as train_mlp, predict as pred_mlp
-from src.models.train_cnn import train as train_cnn, predict as pred_cnn
+from src.models.train_mlp import train as train_mlp, predict as pred_mlp, _train_one as refit_mlp
+from src.models.train_cnn import train as train_cnn, predict as pred_cnn, _train_one as refit_cnn
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -126,6 +127,7 @@ def run_model(name, train_fn, pred_fn,
 
     X_trainval = np.vstack([X_train, X_val])
     y_trainval = np.concatenate([y_train, y_val])
+    cv_folds = config["training"]["cv_folds"]
 
     # Parent run
     with mlflow.start_run(run_name=f"{name}_experiment"):
@@ -139,11 +141,10 @@ def run_model(name, train_fn, pred_fn,
         mlflow.set_tag("pipeline_run_id", pipeline_run_id)
 
         # CV on X_train → child runs logged inside
-        model, best_params, cv_score = train_fn(X_train, y_train, n_classes)
+        model, best_params, cv_score = train_fn(X_train, y_train, n_classes, cv_folds)
 
         # Refit best model on X_train + X_val
         if name in ["plsda", "svm", "rf"]:
-            from sklearn.base import clone
             final_model = clone(model)
             safe_params = {
                 k: v for k, v in best_params.items()
@@ -152,9 +153,13 @@ def run_model(name, train_fn, pred_fn,
             final_model.fit(X_trainval, y_trainval)
             y_pred = np.array(final_model.predict(X_test)).astype(int)
         else:
-            train_fn_map = {"mlp": train_mlp, "cnn": train_cnn}
-            final_model, _, _ = train_fn_map[name](
-                X_trainval, y_trainval, n_classes)
+            train_one_map = {
+                "mlp": refit_mlp,
+                "cnn": refit_cnn }
+            _, final_model = train_one_map[name](
+                X_trainval, y_trainval,
+                X_trainval, y_trainval,  # dummy val
+                best_params, n_classes)
             y_pred = np.array(pred_fn(final_model, X_test)).astype(int)
 
         # Compute test metrics
@@ -293,6 +298,7 @@ def main():
     n_classes = len(le.classes_)
     class_names = list(le.classes_)
     data_version = "v2" if config["preprocessing"]["apply_advanced"] else "v1"
+    model_name = config["training"]["model_name"]
 
     pipeline_run_id = os.environ.get("PIPELINE_RUN_ID", str(uuid.uuid4()))
     Path("data/pipeline_run_id.txt").write_text(pipeline_run_id)
@@ -304,29 +310,35 @@ def main():
 
     logger.info(f"Experiment: {config['mlflow']['experiment_name']}")
     logger.info(f"Data version: {data_version} | Classes: {class_names}")
+    logger.info(f"Model Name: {model_name}")
 
-    models = [("plsda", train_plsda, pred_plsda),
-        ("svm", train_svm, pred_svm),
-        ("rf", train_rf, pred_rf),
-        ("mlp", train_mlp, pred_mlp),
-        ("cnn", train_cnn, pred_cnn)]
 
-    results = {}
-    for name, train_fn, pred_fn in models:
-        results[name] = run_model(
-            name, train_fn, pred_fn,
-            X_train, y_train,
-            X_val, y_val,
-            X_test, y_test,
-            n_classes, class_names,
-            config, data_version,
-            pipeline_run_id)
+    model_map = { "plsda": (train_plsda, pred_plsda),
+        "svm": (train_svm, pred_svm),
+        "rf": (train_rf, pred_rf),
+        "mlp": (train_mlp, pred_mlp),
+        "cnn": (train_cnn, pred_cnn)}
+    if model_name not in model_map:
+        raise ValueError(
+            f"Unknown model '{model_name}'. "
+            f"Choose from: {list(model_map.keys())}")
 
-    logger.info("=" * 50)
-    logger.info("TRAINING COMPLETE — RESULTS SUMMARY")
-    for name, f1 in sorted(results.items(), key=lambda x: -x[1]):
-        logger.info(f"  {name:10s}  f1_weighted={f1:.4f}")
-    logger.info("=" * 50)
+    train_fn, pred_fn = model_map[model_name]
+
+    try:
+        f1 = run_model(
+        model_name, train_fn, pred_fn,
+        X_train, y_train,
+        X_val, y_val,
+        X_test, y_test,
+        n_classes, class_names,
+        config, data_version,
+        pipeline_run_id)
+
+        logger.info(f"TRAINING COMPLETE {model_name:10s}  f1_weighted={f1:.4f}")
+    except Exception as e:
+        logger.error(f"Training failed for model '{model_name}': {e}")
+        raise
 
 
 if __name__ == "__main__":

@@ -53,21 +53,29 @@ session_id = st.session_state["session_id"]
 # API helpers
 def check_api_health():
     try:
-        return requests.get(f"{API_URL}/health", timeout=3).status_code == 200
+        return requests.get(f"{API_URL}/ready", timeout=30).status_code == 200
     except Exception:
         return False
 
 def get_classes():
     try:
-        return requests.get(f"{API_URL}/classes", timeout=3).json()["classes"]
+        return requests.get(f"{API_URL}/classes", timeout=30).json()["classes"]
     except Exception:
         return []
 
 def predict(file_bytes, filename):
-    r = requests.post(f"{API_URL}/predict",
-                      files={"file": (filename, file_bytes)}, timeout=30)
-    r.raise_for_status()
-    return r.json()["predictions"]
+    try:
+        r = requests.post(f"{API_URL}/predict",
+                          files={"file": (filename, file_bytes)}, timeout=30)
+        if r.status_code == 200:
+            return r.json()["predictions"]
+        else:
+            detail = r.json().get("detail", "Unknown error") if r.content else "No response"
+            st.error(f"Prediction failed: {detail}")
+            return None
+    except Exception as e:
+        st.error(f"Cannot reach API: {e}")
+        return None
 
 def submit_feedback(filename, ground_truth):
     r = requests.post(f"{API_URL}/feedback",
@@ -335,9 +343,9 @@ with tab_feedback:
                         if spec["wavenumber"]:
                             fig = spectrum_chart(spec["wavenumber"], spec["intensity"],
                                                  title=fname)
-                            st.plotly_chart(fig, use_container_width=True)
-                    except Exception:
-                        st.caption("Spectrum file not available")
+                            st.plotly_chart(fig, use_container_width=True, key=f"spectrum_{pid}")
+                    except Exception as e:
+                        st.caption(f"Spectrum file not available: {e}")
 
                 with col2:
                     st.metric("Predicted Class", pred["predicted_class"])

@@ -23,10 +23,14 @@ reports/
 # Runtime
 *.db
 *.log
+logs
 airflow/logs/
+data/labeled
+data/predictions
 
 .dvc/tmp/
 
 # IDE
 .vscode/
 .idea/
+/reports

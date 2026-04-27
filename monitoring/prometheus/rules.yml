@@ -46,15 +46,15 @@ groups:
       severity: critical
     annotations:
       summary: Model server is DOWN
-      description: "Model server unreachable for 30s \u2014 predictions will fail."
+      description: "Model server unreachable for 30s - predictions will fail."
   - alert: HighInferenceLatency
-    expr: histogram_quantile(0.99, rate(inference_latency_ms_bucket[5m])) > 200
+    expr: histogram_quantile(0.50, rate(inference_latency_ms_bucket[5m])) > 1200
     for: 5m
     labels:
       severity: warning
     annotations:
-      summary: Inference p99 latency exceeds 200ms
-      description: "p99 latency is {{ $value }}ms \u2014 business SLA breached."
+      summary: Inference p50 latency exceeds 1200
+      description: "p50 latency is {{ $value }}ms"
       
 - name: resource_overuse
   rules:

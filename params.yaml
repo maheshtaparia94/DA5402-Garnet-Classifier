@@ -9,12 +9,12 @@ data:
     - Grossular
     - Pyrope
     - Spessartite
-  separator:  "\t"
+  separator: "\t"
   has_header: false
 
 wavenumber:
-  start:    200
-  end:      1300
+  start: 200
+  end: 1300
   n_points: 1101
 
 preprocessing:
@@ -24,7 +24,7 @@ preprocessing:
     max_iter: 50
   smoothing:
     window_length: 11
-    polyorder:     3
+    polyorder: 3
 
 split:
   test_size: 0.15
@@ -34,6 +34,13 @@ split:
 baseline_stats:
   std_threshold: 3.0
 
+training:
+  model_name: cnn
+  cv_folds: 5
+
+evaluation:
+  min_f1_threshold: 0.7
+
 mlflow:
   tracking_uri: mlruns
   registry_name: garnet-classifier
@@ -42,5 +49,3 @@ mlflow:
 monitoring:
   error_rate_threshold: 0.05
 
-evaluation:
-  min_f1_threshold: 0.7
