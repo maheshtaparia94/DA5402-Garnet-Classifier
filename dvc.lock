@@ -32,7 +32,7 @@ stages:
           separator: "\t"
           has_header: false
         preprocessing:
-          apply_advanced: false
+          apply_advanced: true
           baseline:
             lam: 100000.0
             max_iter: 50
@@ -46,15 +46,15 @@ stages:
     outs:
     - path: data/processed/spectra_preprocessed.csv
       hash: md5
-      md5: 2b693a8a40f17cc3b2814249a18cb70d
-      size: 2981837
+      md5: 5d4b1c8f5cf296889e030ee41a9c2394
+      size: 3407405
   split_data:
     cmd: python -m src.data.splitter
     deps:
     - path: data/processed/spectra_preprocessed.csv
       hash: md5
-      md5: 2b693a8a40f17cc3b2814249a18cb70d
-      size: 2981837
+      md5: 5d4b1c8f5cf296889e030ee41a9c2394
+      size: 3407405
     - path: src/data/splitter.py
       hash: md5
       md5: e146da32b7b17f1fe8f2e66ee0accbb5
@@ -72,7 +72,7 @@ stages:
     outs:
     - path: data/splits/
       hash: md5
-      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      md5: 6a41aec2523745ef5a5fe883260b49a1.dir
       size: 1305838
       nfiles: 7
   baseline_stats:
@@ -80,7 +80,7 @@ stages:
     deps:
     - path: data/splits/
       hash: md5
-      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      md5: 6a41aec2523745ef5a5fe883260b49a1.dir
       size: 1305838
       nfiles: 7
     - path: src/data/baseline_stats.py
@@ -98,19 +98,19 @@ stages:
     outs:
     - path: data/reference/
       hash: md5
-      md5: ef5928554214d0615702e3ae8da5e9dd.dir
-      size: 62484
+      md5: 3f6327ee0b0904b78deb979eb226fbac.dir
+      size: 67272
       nfiles: 2
   eda:
     cmd: python -m src.data.eda
     deps:
     - path: data/processed/spectra_preprocessed.csv
       hash: md5
-      md5: 2b693a8a40f17cc3b2814249a18cb70d
-      size: 2981837
+      md5: 5d4b1c8f5cf296889e030ee41a9c2394
+      size: 3407405
     - path: data/splits/
       hash: md5
-      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      md5: 6a41aec2523745ef5a5fe883260b49a1.dir
       size: 1305838
       nfiles: 7
     - path: src/data/eda.py
@@ -124,15 +124,15 @@ stages:
     outs:
     - path: reports/
       hash: md5
-      md5: 40ee39c795841a829bd63e999d426241.dir
-      size: 811126
+      md5: 2ae387644c56664af1a62c5f9e9510a2.dir
+      size: 908638
       nfiles: 5
   train:
     cmd: python -m src.models.train_model
     deps:
     - path: data/splits/
       hash: md5
-      md5: 34cafcd265f0c7ecd7dc93bd597da0e7.dir
+      md5: 6a41aec2523745ef5a5fe883260b49a1.dir
       size: 1305838
       nfiles: 7
     - path: src/models/train_cnn.py
@@ -170,12 +170,12 @@ stages:
           registry_name: garnet-classifier
           experiment_name: garnet-classifier
         training:
-          model_name: mlp
+          model_name: cnn
           cv_folds: 5
     outs:
     - path: data/pipeline_run_id.txt
       hash: md5
-      md5: 58771cd4c37819d7eaf1ea5dd570456e
+      md5: 74837aa503df69452c857121af84e56e
       size: 36
   evaluate:
     cmd: python -m src.models.evaluate
@@ -209,12 +209,12 @@ stages:
       nfiles: 29
     - path: data/pipeline_run_id.txt
       hash: md5
-      md5: 58771cd4c37819d7eaf1ea5dd570456e
+      md5: 74837aa503df69452c857121af84e56e
       size: 36
     - path: src/models/evaluate_register.py
       hash: md5
-      md5: 218724ab23622d79ead98c99cc8d02ff
-      size: 6515
+      md5: fad728ffaa71b67b14978d5262d899d4
+      size: 6612
     - path: src/utils.py
       hash: md5
       md5: 0eafb4e0ee034311499e023467588aff
