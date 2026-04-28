@@ -1,0 +1,12 @@
+FROM apache/airflow:2.9.3-python3.12
+
+# Install git for DAG git commit operations
+USER root
+RUN apt-get update && apt-get install -y git && apt-get clean
+
+# Install project training requirements
+USER airflow
+ENV NUMBA_CACHE_DIR=/tmp/numba_cache
+
+COPY requirements/requirements-train.txt /tmp/requirements-train.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-train.txt

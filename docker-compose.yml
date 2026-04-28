@@ -1,0 +1,175 @@
+services:
+
+  app-postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${PSQL_APP_USER}
+      POSTGRES_PASSWORD: ${PSQL_APP_PASSWORD}
+      POSTGRES_DB: ${PSQL_APP_DB}
+    volumes:
+      - app-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${PSQL_APP_USER}"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - api-network
+
+  model-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.model-server
+    ports:
+      - "5001:5001"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+      MLFLOW_ARTIFACTS_DESTINATION: /mlflow/artifacts
+      MODEL_URI: models:/garnet-classifier@production
+      MODEL_PORT: "5001"
+    volumes:
+      - mlflow-artifacts:/mlflow/artifacts
+    depends_on:
+      - app-postgres
+    restart: unless-stopped
+    networks:
+      - mlflow-network
+      - api-network
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow-server:5000
+      MODEL_SERVER_URL: http://model-server:5001
+      PSQL_APP_USER: ${PSQL_APP_USER}
+      PSQL_APP_PASSWORD: ${PSQL_APP_PASSWORD}
+      PSQL_APP_DB: ${PSQL_APP_DB}
+      PSQL_APP_HOST: app-postgres
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.70}
+    volumes:
+      - ./data/predictions:/app/data/predictions
+      - ./data/labeled:/app/data/labeled
+      - ./data/splits:/app/data/splits
+      - ./data/reference:/app/data/reference
+    depends_on:
+      app-postgres:
+        condition: service_healthy
+      model-server:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - api-network
+      - monitoring-network
+      - mlflow-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+
+  grafana:
+    image: grafana/grafana:latest
+    mem_limit: 450m
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    environment:
+      MAILTRAP_USERNAME: ${MAILTRAP_USERNAME}
+      MAILTRAP_PASSWORD: ${MAILTRAP_PASSWORD}
+      ALERT_EMAIL: ${ALERT_EMAIL}
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml.tmpl
+    entrypoint: >
+      sh -c "sed 's/$${MAILTRAP_USERNAME}/'"$$MAILTRAP_USERNAME"'/g;
+      s/$${MAILTRAP_PASSWORD}/'"$$MAILTRAP_PASSWORD"'/g;
+      s/$${ALERT_EMAIL}/'"$$ALERT_EMAIL"'/g'
+      /etc/alertmanager/alertmanager.yml.tmpl
+      > /etc/alertmanager/alertmanager.yml &&
+      /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml"
+    restart: unless-stopped
+    networks:
+      - monitoring-network
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
+    ports:
+      - "8501:8501"
+      - "8002:8002"
+    environment:
+      API_URL: http://fastapi:8000
+      AIRFLOW_URL: http://airflow-webserver:8080
+    restart: unless-stopped
+    networks:
+      - api-network
+      - airflow-network
+      - monitoring-network
+
+volumes:
+  app-postgres-data:
+  prometheus-data:
+  grafana-data:
+  mlflow-artifacts:
+    external: true
+
+networks:
+  mlflow-network:
+    external: true
+    name: mlflow-network
+  api-network:
+    driver: bridge
+    name: api-network
+  monitoring-network:
+    driver: bridge
+    name: monitoring-network
+  airflow-network:
+    external: true

@@ -40,7 +40,7 @@ groups:
       summary: Data drift detected
       description: Drift score is {{ $value }}.
   - alert: ModelServerDown
-    expr: up{job="model-server-status"} == 0
+    expr: model_server_up == 0
     for: 30s
     labels:
       severity: critical
