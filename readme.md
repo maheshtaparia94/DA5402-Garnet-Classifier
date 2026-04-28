@@ -212,8 +212,8 @@ API_URL=http://localhost:8000 python -m pytest tests/test_api.py -v
 |-----------|-----------|
 | Golden test set (15%) fixed, never used in training | Constant benchmark across all model versions |
 | `@production` alias = best deployed model | Survives restarts and code changes |
-| Online serving over batch | Lab instruments produce spectra one at a time |
-| Z-score threshold 0.3 indicates drift | Empirically chosen, tunable via params.yaml |
+| Online serving | Lab instruments produce spectra one at a time |
+| Z-score threshold 0.5 indicates drift | Empirically chosen |
 | Confidence threshold 0.70 for low-confidence flag | Below 70% warrants human review |
 | Self-hosted CI/CD runner | For local deployment |
 | DVC local remote at ~/dvc-remote | Configurable via .dvc/config |
