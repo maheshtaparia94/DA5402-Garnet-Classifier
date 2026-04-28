@@ -439,7 +439,7 @@ with tab_pipeline:
                 size="6,2"
                 node [shape=box style=filled fillcolor="#1e3a5f" fontcolor=white color="#00b4d8" fontname=monospace fontsize=12]
                 edge [color="#00b4d8"]
-                dvc_repro -> git_push
+                dvc_repro -> git_commit
             }
         """, use_container_width=True)
 

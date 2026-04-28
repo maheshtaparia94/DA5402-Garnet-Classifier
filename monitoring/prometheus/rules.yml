@@ -17,7 +17,7 @@ groups:
       description: FastAPI unreachable for 30s.
   - alert: PredictionErrorRate
     expr: actual_error_rate > 0.05
-    for: 15m
+    for: 5m
     labels:
       severity: critical
     annotations:
@@ -25,22 +25,22 @@ groups:
       description: Error rate {{ $value | humanizePercentage }} from feedback.
   - alert: HighLowConfidenceRate
     expr: low_confidence_rate > 0.70
-    for: 15m
+    for: 5m
     labels:
       severity: warning
     annotations:
       summary: Low confidence rate exceeds 70%
       description: Low confidence rate {{ $value | humanizePercentage }}.
   - alert: DataDriftDetected
-    expr: avg_over_time(drift_score[1h]) > 0.3
-    for: 15m
+    expr: avg_over_time(drift_score[1h]) > 0.5
+    for: 5m
     labels:
       severity: warning
     annotations:
       summary: Data drift detected
       description: Drift score is {{ $value }}.
   - alert: ModelServerDown
-    expr: up{job="model-server"} == 0
+    expr: up{job="model-server-status"} == 0
     for: 30s
     labels:
       severity: critical
@@ -64,15 +64,15 @@ groups:
     labels:
       severity: warning
     annotations:
-      summary: CPU above 80% for 2+ minutes
+      summary: CPU above 80% for 5+ minutes
       description: CPU at {{ $value | humanizePercentage }}.
   - alert: LowMemoryAvailable
     expr: "(node_memory_MemAvailable_bytes /\n node_memory_MemTotal_bytes) < 0.10\n"
-    for: 2m
+    for: 5m
     labels:
       severity: warning
     annotations:
-      summary: Available RAM below 20%
+      summary: Available RAM below 10%
       description: Only {{ $value | humanizePercentage }} RAM free.
   - alert: DiskSpaceLow
     expr: "(node_filesystem_avail_bytes{mountpoint=\"/\"}\n / node_filesystem_size_bytes{mountpoint=\"\
@@ -82,4 +82,4 @@ groups:
       severity: warning
     annotations:
       summary: Disk below 10%
-      description: Root filesystem nearly full.s
+      description: Root filesystem nearly full.

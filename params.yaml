@@ -35,7 +35,7 @@ baseline_stats:
   std_threshold: 3.0
 
 training:
-  model_name: cnn
+  model_name: plsda
   cv_folds: 5
 
 evaluation:

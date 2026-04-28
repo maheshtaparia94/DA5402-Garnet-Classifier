@@ -370,7 +370,7 @@ def get_pipeline_runs():
         runs = client.search_runs(
             experiment_ids=[exp.experiment_id],
             order_by=["attributes.start_time DESC"],
-            max_results=100)
+            max_results=300)
         
         # Filter parent runs only (no parentRunId tag)
         parent_runs = [r for r in runs
