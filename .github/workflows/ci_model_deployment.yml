@@ -33,18 +33,18 @@ jobs:
 
       - name: Start FastAPI
         env:
-          MODEL_SERVER_URL:  http://localhost:5001
-          PSQL_APP_HOST:     localhost
-          PSQL_APP_USER:     ${{ secrets.PSQL_APP_USER }}
+          MODEL_SERVER_URL: http://localhost:5001
+          PSQL_APP_HOST: localhost
+          PSQL_APP_USER: ${{ secrets.PSQL_APP_USER }}
           PSQL_APP_PASSWORD: ${{ secrets.PSQL_APP_PASSWORD }}
-          PSQL_APP_DB:       ${{ secrets.PSQL_APP_DB }}
+          PSQL_APP_DB: ${{ secrets.PSQL_APP_DB }}
         run: |
-          uvicorn api.main:app --host 0.0.0.0 --port 8001 &
+          uvicorn api.main:app --host 0.0.0.0 --port 8005 &
           sleep 5
 
       - name: Integration tests (no model needed)
         env:
-          API_URL: http://localhost:8001
+          API_URL: http://localhost:8005
         run: |
           python -m pytest tests/test_api.py -v -m "not needs_model"
           pkill -f "uvicorn api.main:app" || true

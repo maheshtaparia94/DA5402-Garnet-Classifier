@@ -41,20 +41,23 @@ PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
 LABELED_DIR.mkdir(parents=True, exist_ok=True)
 CURRENT_VERSION = "production"
 DATA_VERSION = "v1"
+_config_loaded = False
 
-try:
-    client = mlflow.tracking.MlflowClient()
-    mv = client.get_model_version_by_alias(REGISTRY_NAME, "production")
-    CURRENT_VERSION = f"v{mv.version}"
-    
-    # Tags are on the run, not the model version
-    run = client.get_run(mv.run_id)
-    adv = run.data.tags.get("apply_advanced", "false")
-    dv  = run.data.tags.get("data_version", "v1")
-    APPLY_ADVANCED = adv.lower() == "true"
-    DATA_VERSION = dv
-except Exception:
-    pass  # keep "production" as default
+def _load_model_config():
+    global CURRENT_VERSION, APPLY_ADVANCED, DATA_VERSION, _config_loaded
+    if _config_loaded:
+        return
+    try:
+        client = mlflow.tracking.MlflowClient()
+        mv = client.get_model_version_by_alias(REGISTRY_NAME, "production")
+        CURRENT_VERSION = f"v{mv.version}"
+        run = client.get_run(mv.run_id)
+        adv = run.data.tags.get("apply_advanced", "false")
+        APPLY_ADVANCED = adv.lower() == "true"
+        DATA_VERSION = run.data.tags.get("data_version", "v1")
+        _config_loaded = True
+    except Exception:
+        pass
 
 # threading.Thread(target=_fetch_version, daemon=True).start()
 
@@ -120,6 +123,7 @@ def health():
 def ready():
     """Readiness check — 200 only when model-server is up and model is loaded."""
     try:
+        _load_model_config()
         r = requests.get(f"{MODEL_SERVER_URL}/ping", timeout=3)
         if r.status_code == 200:
             model_server_up.set(1)
@@ -257,29 +261,30 @@ def predict(file: UploadFile = File(...), dry_run: bool = False, db: Session = D
             predicted_class = CLASSES[int(np.argmax(probs))]
             confidence = float(np.max(probs))
             is_low = confidence < CONF_THRESHOLD
-
-            # ── Drift detection
-            if DETECTOR:
-                det_result = DETECTOR.detect(X.flatten())
-            else:
-                det_result = {"drift_score": 0.0, "is_drifted": False}
-            d_score = float(det_result["drift_score"])
-            d_flagged = bool(det_result["is_drifted"])
-            drift_score.set(d_score)
-
-            # ── Save spectrum file
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            file_path = PREDICTIONS_DIR / f"{ts}_{fname}"
-            with open(file_path, "w") as fout:
-                for w, iv in zip(wn, intensity):
-                    fout.write(f"{w}\t{iv}\n")
-
-            # Prometheus counters
-            predictions_total.inc()
-            if is_low:
-                low_confidence_total.inc()
+  
 
             if not dry_run:
+                 # ── Drift detection
+                if DETECTOR:
+                    det_result = DETECTOR.detect(X.flatten())
+                else:
+                    det_result = {"drift_score": 0.0, "is_drifted": False}
+                d_score = float(det_result["drift_score"])
+                d_flagged = bool(det_result["is_drifted"])
+                drift_score.set(d_score)
+
+                # ── Save spectrum file
+                ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                file_path = PREDICTIONS_DIR / f"{ts}_{fname}"
+                with open(file_path, "w") as fout:
+                    for w, iv in zip(wn, intensity):
+                        fout.write(f"{w}\t{iv}\n")
+
+                # Prometheus counters
+                predictions_total.inc()
+                if is_low:
+                    low_confidence_total.inc()
+
                 # ── Store to DB 
                 db.add(Prediction(
                     filename = fname,
