@@ -170,12 +170,12 @@ stages:
           registry_name: garnet-classifier
           experiment_name: garnet-classifier
         training:
-          model_name: cnn
+          model_name: plsda
           cv_folds: 5
     outs:
     - path: data/pipeline_run_id.txt
       hash: md5
-      md5: 74837aa503df69452c857121af84e56e
+      md5: 8c96d1e7b64e9e7705193d7694d16479
       size: 36
   evaluate:
     cmd: python -m src.models.evaluate
@@ -209,7 +209,7 @@ stages:
       nfiles: 29
     - path: data/pipeline_run_id.txt
       hash: md5
-      md5: 74837aa503df69452c857121af84e56e
+      md5: 8c96d1e7b64e9e7705193d7694d16479
       size: 36
     - path: src/models/evaluate_register.py
       hash: md5
